@@ -1,0 +1,27 @@
+.notice {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in oklch, var(--destructive) 30%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--destructive) 8%, var(--background));
+  font-size: 0.875rem;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  color: var(--destructive);
+}
+
+.again {
+  margin-top: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}

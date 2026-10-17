@@ -1,0 +1,59 @@
+# The decision module's own checks (docs/foundations.md#the-decision-model): its demo,
+# through the backend, against the fake and against Laya on CPU. It belongs to the module:
+# deleting the module deletes this workflow. Its jobs start only the services they need, so
+# other modules' services stay out.
+name: Decision module
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decision-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The chat model isn't what these jobs check: the fake answers in its place.
+  LLM_PROVIDER: fake
+  LLM_LOCAL_SERVER: "0"
+
+jobs:
+  fake:
+    name: The decision demo against the fake
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DECISION_PROVIDER: fake
+      DECISION_LOCAL_SERVER: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the backend
+        run: docker compose up -d --wait backend
+      - name: The decision demo, through the backend
+        run: docker compose run --rm decision-demo
+      - name: Logs
+        if: failure()
+        run: docker compose logs
+
+  laya:
+    name: The decision demo against Laya, on CPU
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the backend, Laya and the web UI (the first start downloads Laya, 0.45 GB)
+        run: docker compose up -d --wait backend decision frontend
+      - name: The decision demo, through the backend
+        run: docker compose run --rm decision-demo
+      - name: The decision demo, through the web UI's origin
+        run: docker compose run --rm -e BACKEND_URL=http://frontend:8080 decision-demo
+      - name: Logs
+        if: failure()
+        run: docker compose logs

@@ -1,0 +1,46 @@
+# The conversations module's own checks (docs/foundations.md#conversations): its migrations
+# against the models on PostgreSQL, its demo through the backend and through the web UI's
+# origin, and its live tests. It belongs to the module: deleting the module deletes this
+# workflow. Its job starts only the services it needs, so other modules' services stay out.
+name: Conversations module
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conversations-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The chat model isn't what this job checks: the fake answers in its place.
+  LLM_PROVIDER: fake
+  LLM_LOCAL_SERVER: "0"
+
+jobs:
+  postgres:
+    name: The conversations demo and the migrations, on PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the backend, PostgreSQL and the web UI
+        run: docker compose up -d --wait backend frontend
+      - name: The migrations match the models, on PostgreSQL
+        run: docker compose run --rm migrate-db alembic check
+      - name: The conversations demo, through the backend
+        run: docker compose run --rm conversations-demo
+      # The same calls through nginx, as the web UI makes them: streams pass the proxy.
+      - name: The conversations demo, through the web UI's origin
+        run: docker compose run --rm -e BACKEND_URL=http://frontend:8080 conversations-demo
+      - name: The live tests, against PostgreSQL
+        run: docker compose run --rm backend-checks pytest -m integration --no-cov -p no:cacheprovider tests/integration/modules/conversations
+      - name: Logs
+        if: failure()
+        run: docker compose logs

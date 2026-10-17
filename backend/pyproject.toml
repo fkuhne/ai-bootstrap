@@ -1,0 +1,146 @@
+[project]
+name = "ai-bootstrap-backend"
+version = "0.1.0"
+description = "The backend: a FastAPI app that talks to the LLM."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "alembic==1.20.0",
+    "asyncpg==0.32.0",
+    "fastapi==0.143.0",
+    "httpx2==2.13.1",
+    "openai==3.27.0",
+    "pydantic-settings==2.15.0",
+    "sqlalchemy[asyncio]==2.1.4",
+    "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "aiosqlite==0.22.1",
+    "import-linter==2.15",
+    "mypy==2.4.0",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.16.10",
+]
+
+[tool.uv]
+# An app, not a library: uv installs its dependencies, not the project itself.
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "-m", "not integration",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-fail-under=90",
+]
+# A warning fails its test: a leak or a deprecation is fixed, not scrolled past.
+filterwarnings = ["error"]
+markers = [
+    "integration: needs running services (docker compose up -d --wait) or the network; excluded by default",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+# Migrations run under Alembic: the migration tests check them against the models instead.
+omit = ["*/migrations/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # flake8-bugbear
+    "UP",       # pyupgrade
+    "SIM",      # flake8-simplify
+    "N",        # pep8-naming
+    "S",        # flake8-bandit (security)
+    "ASYNC",    # flake8-async
+    "PT",       # flake8-pytest-style
+    "C4",       # flake8-comprehensions
+    "RET",      # flake8-return
+    "PTH",      # flake8-use-pathlib
+    "TID",      # flake8-tidy-imports
+    "ARG",      # flake8-unused-arguments
+    "RUF",      # Ruff-specific rules
+]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",  # pytest uses assert
+    "ARG",   # test doubles implement interfaces whose arguments they don't need
+]
+
+# The conversations module's database migrations, applied by its migrate-db job at every
+# start. With the stack up:
+#   docker compose run --rm backend-checks alembic revision --autogenerate -m "<change>"
+#   docker compose run --rm backend-checks alembic check    # do the models and the migrations agree?
+# The database is DATABASE_URL, read by the migrations' env.py through the module's settings.
+# Removing the module removes this section too.
+[tool.alembic]
+script_location = "%(here)s/app/modules/conversations/migrations"
+prepend_sys_path = ["."]
+file_template = "%%(year)d%%(month).2d%%(day).2d-%%(rev)s-%%(slug)s"
+
+# New migration files pass the same format and lint checks as the rest of the code.
+[[tool.alembic.post_write_hooks]]
+name = "ruff_format"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_lint"
+type = "module"
+module = "ruff"
+options = "check --fix REVISION_SCRIPT_FILENAME"
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.importlinter]
+root_package = "app"
+
+# Each domain uses only the layers below it, and only app.main wires the domains
+# together. Add each new domain here; a module goes in app.modules, which is listed already.
+[[tool.importlinter.contracts]]
+name = "The app wires the domains; the domains use only the layers below them"
+type = "layers"
+layers = [
+    "app.main",
+    "app.health | app.modules",
+    "app.llm | app.users",
+    "app.core",
+]
+
+# A module stands alone: an app keeps or deletes each one by itself.
+[[tool.importlinter.contracts]]
+name = "Modules don't import each other"
+type = "independence"
+modules = ["app.modules.*"]

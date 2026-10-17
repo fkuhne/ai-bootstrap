@@ -1,0 +1,89 @@
+{
+  "about": "Sample chunks for the RAG module: the help centre of a fictional shop, and questions with the chunk each should find. Made up, for trying the Documents page and checking retrieval.",
+  "chunks": [
+    {
+      "id": "sample-returns-1",
+      "source": "samples/returns.md",
+      "title": "Returning an item",
+      "text": "You can return most items within 30 days of delivery. Items must be unused, with their labels on and in their original packaging. Start a return from Orders in your account, choose the item, and print the prepaid label."
+    },
+    {
+      "id": "sample-returns-2",
+      "source": "samples/returns.md",
+      "title": "Refunds",
+      "text": "Once a returned item reaches our warehouse, we check it within two working days. The refund then goes back to the original payment method; banks usually show it within five to seven working days."
+    },
+    {
+      "id": "sample-returns-3",
+      "source": "samples/returns.md",
+      "title": "Items that can't be returned",
+      "text": "Gift cards, earrings, swimwear without its hygiene seal and personalised items can't be returned, unless they arrived damaged or faulty."
+    },
+    {
+      "id": "sample-delivery-1",
+      "source": "samples/delivery.md",
+      "title": "Delivery times and costs",
+      "text": "Standard delivery takes three to five working days and is free on orders over 50 euros; below that it costs 4.95. Express delivery arrives the next working day if you order before 2 pm, and costs 9.95."
+    },
+    {
+      "id": "sample-delivery-2",
+      "source": "samples/delivery.md",
+      "title": "Delivering abroad",
+      "text": "We deliver to every country in the European Union, and to Norway, Switzerland and the United Kingdom. International orders take five to ten working days; outside the European Union, the recipient pays any customs duties."
+    },
+    {
+      "id": "sample-delivery-3",
+      "source": "samples/delivery.md",
+      "title": "Tracking a parcel",
+      "text": "When your parcel leaves the warehouse, you get an email with its tracking number, and the carrier's page shows where it is. A parcel that hasn't moved for five days can be reported from Orders."
+    },
+    {
+      "id": "sample-payments-1",
+      "source": "samples/payments.md",
+      "title": "Ways to pay",
+      "text": "We accept Visa, Mastercard, American Express, PayPal and bank transfer. A bank transfer reserves the order for three days, and it ships once the money arrives."
+    },
+    {
+      "id": "sample-payments-2",
+      "source": "samples/payments.md",
+      "title": "A declined payment",
+      "text": "A card can be declined by its bank for a spending limit, a wrong security code or an expiry date in the past. Nothing is charged for a declined payment: try another card, or ask your bank to allow the purchase."
+    },
+    {
+      "id": "sample-account-1",
+      "source": "samples/account.md",
+      "title": "Changing your password",
+      "text": "To change your password, open Account, then Security, and enter your current password and the new one twice. If you forgot it, use Forgot password on the sign-in page: a link valid for one hour arrives by email."
+    },
+    {
+      "id": "sample-account-2",
+      "source": "samples/account.md",
+      "title": "Deleting your account",
+      "text": "You can delete your account from Account, then Privacy. Your order history is kept for seven years, as tax law requires, but your address, phone number and saved cards are erased at once."
+    },
+    {
+      "id": "sample-errors-1",
+      "source": "samples/errors.md",
+      "title": "Error E-2041",
+      "text": "Error E-2041 means the carrier couldn't verify the address. Check the postcode and the house number, then try again; if it keeps failing, enter the address exactly as it appears on a letter you received there."
+    },
+    {
+      "id": "sample-errors-2",
+      "source": "samples/errors.md",
+      "title": "Error E-3307",
+      "text": "Error E-3307 appears when a discount code has expired, or was already used on another order. Each code works once per account, until the date printed on it."
+    }
+  ],
+  "questions": [
+    {"question": "What does error E-2041 mean?", "expected": "sample-errors-1", "asks": "by an exact code"},
+    {"question": "My promo code shows E-3307", "expected": "sample-errors-2", "asks": "by an exact code"},
+    {"question": "Can I send back a jacket I already wore?", "expected": "sample-returns-1", "asks": "in other words"},
+    {"question": "How long until my money is back after a return?", "expected": "sample-returns-2", "asks": "in other words"},
+    {"question": "Do you ship to Switzerland?", "expected": "sample-delivery-2", "asks": "by its words"},
+    {"question": "How much is next-day delivery?", "expected": "sample-delivery-1", "asks": "in other words"},
+    {"question": "Why was my card refused?", "expected": "sample-payments-2", "asks": "in other words"},
+    {"question": "I forgot my password", "expected": "sample-account-1", "asks": "by its words"},
+    {"question": "Where is my parcel now?", "expected": "sample-delivery-3", "asks": "in other words"},
+    {"question": "Can I return earrings?", "expected": "sample-returns-3", "asks": "by its words"}
+  ]
+}

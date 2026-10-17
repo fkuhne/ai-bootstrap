@@ -1,0 +1,2878 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ai-bootstrap",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness",
+        "description": "Answers while the process is up. It checks no dependencies.",
+        "operationId": "liveness_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Liveness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness",
+        "description": "Checks every dependency at once: the LLM, and each module that's on. Answers 503 while one of them is unavailable.",
+        "operationId": "readiness_api_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/model": {
+      "get": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "The model, and the inputs it accepts",
+        "description": "The model that answers, and what a message to it may carry: text, and images, audio or video when the model takes them, as its server reports them or `LLM_INPUTS` says. The web UI offers attachments for those.",
+        "operationId": "model_api_llm_model_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfo"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The LLM endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The LLM endpoint refused the request"
+          },
+          "503": {
+            "description": "The LLM endpoint can't be reached, or is down"
+          },
+          "504": {
+            "description": "The LLM endpoint didn't answer in time"
+          }
+        }
+      }
+    },
+    "/api/modules": {
+      "get": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "The modules that are on",
+        "description": "The modules the app's settings turn on, in the order the app lists them, whether or not they're ready: `/api/health/ready` says that.",
+        "operationId": "modules_api_modules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Ask the model, and get its whole answer",
+        "description": "Sends the messages and parameters to the configured model and returns its answer, with its reasoning when the model shows it.",
+        "operationId": "chat_api_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Completion"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The LLM endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The LLM endpoint refused the request"
+          },
+          "503": {
+            "description": "The LLM endpoint can't be reached, or is down"
+          },
+          "504": {
+            "description": "The LLM endpoint didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/stream": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Ask the model, and stream its answer as server-sent events",
+        "description": "Emits `reasoning` events while the model reasons, `token` events with pieces of the answer, then `done` with the finish reason and the usage. If the model fails once the stream has started, an `error` event ends it instead. Closing the stream stops the model.",
+        "operationId": "chat_stream_api_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Start a conversation",
+        "description": "Starts an empty conversation. Its first question with text gives its title.",
+        "operationId": "start_conversation_api_conversations_post",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List conversations",
+        "description": "This user's conversations, without their messages, the most recently updated first.",
+        "operationId": "list_conversations_api_conversations_get",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationSummary"
+                  },
+                  "title": "Response List Conversations Api Conversations Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Open a conversation",
+        "description": "One conversation with all its messages, oldest first: every question as it was asked, and every answer with its reasoning and how it was made.",
+        "operationId": "open_conversation_api_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationWithMessages"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this user: it doesn't exist, was deleted, or belongs to another id"
+          },
+          "503": {
+            "description": "The database is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Delete a conversation",
+        "description": "Deletes the conversation and all its messages. It can't be undone.",
+        "operationId": "delete_conversation_api_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such conversation for this user: it doesn't exist, was deleted, or belongs to another id"
+          },
+          "503": {
+            "description": "The database is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/messages": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Ask in a conversation",
+        "description": "Sends the conversation's messages and the new question to the model, with any parameters, and returns the question and the answer as stored: the answer with its reasoning and how it was made. If the model fails, nothing is stored.",
+        "operationId": "ask_api_conversations__conversation_id__messages_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredTurn"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this user: it doesn't exist, was deleted, or belongs to another id"
+          },
+          "503": {
+            "description": "The LLM endpoint can't be reached, or is down"
+          },
+          "429": {
+            "description": "The LLM endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The LLM endpoint refused the request"
+          },
+          "504": {
+            "description": "The LLM endpoint didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversation_id}/messages/stream": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Ask in a conversation, and stream the answer",
+        "description": "The same answer as `/messages`, as server-sent events, like `/api/chat/stream`: `reasoning` and `token` events as the model writes, then `done` with how it ended and the ids the question and the answer were stored under. The turn is stored just before `done`. If the model or the database fails once the stream has started, an `error` event ends it, and nothing is stored; nor is anything if the client goes away first.",
+        "operationId": "ask_stream_api_conversations__conversation_id__messages_stream_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it.",
+              "examples": [
+                "3f2b8c1e-6d4a-4f7e-9b0a-2c5d8e1f4a7b"
+              ],
+              "title": "X-User-Id"
+            },
+            "description": "The anonymous id the browser generated and keeps: a UUID. What a user stores belongs to it, and another id sees none of it."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation for this user: it doesn't exist, was deleted, or belongs to another id"
+          },
+          "503": {
+            "description": "The database is unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/decide": {
+      "post": {
+        "tags": [
+          "decision"
+        ],
+        "summary": "Answer typed questions about a state",
+        "description": "Sends the state and the questions to the decision model, in the System One format: `noul` questions are answered with the probability of yes, `choice` questions with each option's probability, and `score` questions with the expected level on their scale. The answers come back under the questions' names.",
+        "operationId": "decide_api_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The decision endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The decision endpoint refused the request"
+          },
+          "503": {
+            "description": "The decision endpoint is unreachable or overloaded"
+          },
+          "504": {
+            "description": "The decision endpoint didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rag/chunks": {
+      "put": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Store chunks",
+        "description": "Embeds each chunk, and keeps it with its BM25 weights, replacing any chunk stored before under its id. The first store makes the collection for the embedding model; a later one with another model is refused with 409.",
+        "operationId": "store_chunks_api_rag_chunks_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stored"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The embeddings' provider is rate-limiting"
+          },
+          "502": {
+            "description": "The embedding model or the store refused, such as a text too long"
+          },
+          "503": {
+            "description": "The embedding model or the store can't be reached"
+          },
+          "504": {
+            "description": "The embedding model or the store didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rag/sources": {
+      "get": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "The sources stored",
+        "description": "Each source the stored chunks came from, by name, and how many chunks it has.",
+        "operationId": "list_sources_api_rag_sources_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceList"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The embeddings' provider is rate-limiting"
+          },
+          "502": {
+            "description": "The embedding model or the store refused, such as a text too long"
+          },
+          "503": {
+            "description": "The embedding model or the store can't be reached"
+          },
+          "504": {
+            "description": "The embedding model or the store didn't answer in time"
+          }
+        }
+      }
+    },
+    "/api/rag/sources/{source}": {
+      "delete": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Delete a source's chunks",
+        "description": "Removes every chunk of the source, as before storing a document's new version, and says how many. A source may hold slashes, such as `help/returns.md`.",
+        "operationId": "delete_source_api_rag_sources__source__delete",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The embeddings' provider is rate-limiting"
+          },
+          "502": {
+            "description": "The embedding model or the store refused, such as a text too long"
+          },
+          "503": {
+            "description": "The embedding model or the store can't be reached"
+          },
+          "504": {
+            "description": "The embedding model or the store didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rag/search": {
+      "post": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Search the chunks",
+        "description": "The chunks that best match the query, best first: by meaning and words fused by rank (`hybrid`), by meaning alone (`dense`), or by words alone (`words`). Each hit has its score in that mode, and its similarity to the query whatever the mode.",
+        "operationId": "search_api_rag_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The embeddings' provider is rate-limiting"
+          },
+          "502": {
+            "description": "The embedding model or the store refused, such as a text too long"
+          },
+          "503": {
+            "description": "The embedding model or the store can't be reached"
+          },
+          "504": {
+            "description": "The embedding model or the store didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rag/ask": {
+      "post": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Answer from the chunks, whole",
+        "description": "Searches the chunks for the last message, the question, and asks the model with the best of them, numbered, before the conversation; the model cites them as [1]. When no chunk is found, or none as similar as RAG_MIN_SIMILARITY asks, the answer is \"The documents don't say.\" and the model isn't asked.",
+        "operationId": "ask_api_rag_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RagQuestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagAnswer"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The LLM endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The LLM endpoint refused the request"
+          },
+          "503": {
+            "description": "The LLM endpoint can't be reached, or is down"
+          },
+          "504": {
+            "description": "The LLM endpoint didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rag/ask/stream": {
+      "post": {
+        "tags": [
+          "rag"
+        ],
+        "summary": "Answer from the chunks, streamed as server-sent events",
+        "description": "As /api/rag/ask: first a `sources` event, the chunks the model is given; then `reasoning` and `token` events; then `done`. A refused question gets its answer as one `token`. A failure once the stream has started ends it with an `error` event.",
+        "operationId": "ask_stream_api_rag_ask_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RagQuestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {
+                "itemSchema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The collection holds another embedding model's vectors"
+          },
+          "429": {
+            "description": "The LLM endpoint is rate-limiting"
+          },
+          "502": {
+            "description": "The LLM endpoint refused the request"
+          },
+          "503": {
+            "description": "The LLM endpoint can't be reached, or is down"
+          },
+          "504": {
+            "description": "The LLM endpoint didn't answer in time"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnswerDetails": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model that wrote the answer."
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "first_token_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Token Ms",
+            "description": "Until the first piece of the answer, when it was streamed."
+          },
+          "total_ms": {
+            "type": "number",
+            "title": "Total Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "finish_reason",
+          "usage",
+          "total_ms"
+        ],
+        "title": "AnswerDetails",
+        "description": "How an answer was made, stored with it as JSON."
+      },
+      "AskRequest": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AudioPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VideoPart"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "type",
+                    "mapping": {
+                      "image_url": "#/components/schemas/ImagePart",
+                      "input_audio": "#/components/schemas/AudioPart",
+                      "input_video": "#/components/schemas/VideoPart",
+                      "text": "#/components/schemas/TextPart"
+                    }
+                  }
+                },
+                "type": "array",
+                "minItems": 1
+              }
+            ],
+            "title": "Content",
+            "description": "Text, or a list of parts with text, images, audio or video."
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Any generation parameter the model accepts, such as temperature, seed or reasoning_effort, sent as given. The provider's defaults apply to the rest."
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "AskRequest",
+        "description": "A question in a conversation. The history is the conversation's own.",
+        "examples": [
+          {
+            "content": "In one sentence, what is an LLM?",
+            "parameters": {
+              "max_tokens": 512
+            }
+          }
+        ]
+      },
+      "AudioPart": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "input_audio",
+            "title": "Type",
+            "default": "input_audio"
+          },
+          "input_audio": {
+            "$ref": "#/components/schemas/Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_audio"
+        ],
+        "title": "AudioPart"
+      },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AudioPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VideoPart"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "type",
+                    "mapping": {
+                      "image_url": "#/components/schemas/ImagePart",
+                      "input_audio": "#/components/schemas/AudioPart",
+                      "input_video": "#/components/schemas/VideoPart",
+                      "text": "#/components/schemas/TextPart"
+                    }
+                  }
+                },
+                "type": "array",
+                "minItems": 1
+              }
+            ],
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage",
+        "description": "One message of the conversation sent to the model."
+      },
+      "ChatRequest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Messages"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Any generation parameter the model accepts, such as temperature, seed or reasoning_effort, sent as given. The provider's defaults apply to the rest."
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "ChatRequest",
+        "description": "The conversation so far, and any generation parameters for the model.",
+        "examples": [
+          {
+            "messages": [
+              {
+                "content": "In one sentence, what is an LLM?",
+                "role": "user"
+              }
+            ],
+            "parameters": {
+              "max_tokens": 512,
+              "reasoning_effort": "none"
+            }
+          }
+        ]
+      },
+      "ChoiceAnswer": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "choice",
+            "title": "Type"
+          },
+          "choice": {
+            "type": "string",
+            "title": "Choice",
+            "description": "The most likely option."
+          },
+          "probabilities": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Probabilities",
+            "description": "Each option's, summing to 1."
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "description": "From 0, every option equally likely, to 1."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "choice",
+          "probabilities",
+          "confidence"
+        ],
+        "title": "ChoiceAnswer"
+      },
+      "ChoiceQuestion": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "choice",
+            "title": "Type"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "criteria": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "minProperties": 2,
+            "title": "Criteria"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "instructions",
+          "criteria"
+        ],
+        "title": "ChoiceQuestion",
+        "description": "One of the named options, each with a description or null."
+      },
+      "Chunk": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id",
+            "description": "The app's own id for the chunk. Storing it again replaces it."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source",
+            "description": "The document it came from: answers cite it, and a source's chunks are deleted together."
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text",
+            "description": "What's embedded and searched."
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "A title, such as its section's, embedded and searched with the text."
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Metadata",
+            "description": "Anything the app keeps with it, returned as given."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "text"
+        ],
+        "title": "Chunk",
+        "description": "A piece of an app's document, as the app cut it."
+      },
+      "Completion": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "content",
+          "model"
+        ],
+        "title": "Completion",
+        "description": "A whole answer from the model, with its reasoning when the model shows it."
+      },
+      "ConversationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "The first question's text; null until there is one."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the last turn was stored."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ConversationSummary",
+        "description": "A conversation, without its messages."
+      },
+      "ConversationWithMessages": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "The first question's text; null until there is one."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the last turn was stored."
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/StoredMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "messages"
+        ],
+        "title": "ConversationWithMessages",
+        "description": "A conversation with all its messages, from the first question to the last answer."
+      },
+      "Decision": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "answers": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NoulAnswer"
+                },
+                {
+                  "$ref": "#/components/schemas/ChoiceAnswer"
+                },
+                {
+                  "$ref": "#/components/schemas/ScoreAnswer"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "choice": "#/components/schemas/ChoiceAnswer",
+                  "noul": "#/components/schemas/NoulAnswer",
+                  "score": "#/components/schemas/ScoreAnswer"
+                }
+              }
+            },
+            "type": "object",
+            "title": "Answers"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "model",
+          "answers"
+        ],
+        "title": "Decision",
+        "description": "The answers, under the questions' names, and the model that gave them."
+      },
+      "DecisionRequest": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/JsonValue",
+            "description": "What to decide about: text, or an object or array, which reaches the model as JSON."
+          },
+          "files": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files",
+            "description": "Images, or sounds for models that take them, as data URLs."
+          },
+          "questions": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NoulQuestion"
+                },
+                {
+                  "$ref": "#/components/schemas/ChoiceQuestion"
+                },
+                {
+                  "$ref": "#/components/schemas/ScoreQuestion"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "choice": "#/components/schemas/ChoiceQuestion",
+                  "noul": "#/components/schemas/NoulQuestion",
+                  "score": "#/components/schemas/ScoreQuestion"
+                }
+              }
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Questions"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "state",
+          "questions"
+        ],
+        "title": "DecisionRequest",
+        "description": "What to decide about, and the questions to answer, each under a name of the caller's.",
+        "examples": [
+          {
+            "questions": {
+              "angry": {
+                "instructions": "Is the customer angry?",
+                "type": "noul"
+              },
+              "team": {
+                "criteria": {
+                  "billing": "Payments, refunds and invoices",
+                  "shipping": "Deliveries and returns",
+                  "technical": "The website and the app"
+                },
+                "instructions": "Which team should handle this?",
+                "type": "choice"
+              },
+              "urgency": {
+                "criteria": [
+                  "can wait",
+                  "this week",
+                  "today",
+                  "right now"
+                ],
+                "instructions": "How urgent is this?",
+                "type": "score"
+              }
+            },
+            "state": "Customer: I was charged twice for my order, and nobody replied."
+          }
+        ]
+      },
+      "DecisionUsage": {
+        "properties": {
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "input_tokens",
+          "output_tokens"
+        ],
+        "title": "DecisionUsage"
+      },
+      "Deleted": {
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "Deleted",
+        "description": "How many chunks were deleted."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Hit": {
+        "properties": {
+          "chunk": {
+            "$ref": "#/components/schemas/Chunk"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Its score in the search's mode: its fused rank's in hybrid, its similarity in dense, its BM25 weight in words. Comparable within one search only."
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity",
+            "description": "How close its meaning is to the question's: the cosine of their vectors, whatever the mode. It depends on the embedding model."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chunk",
+          "score",
+          "similarity"
+        ],
+        "title": "Hit",
+        "description": "A chunk found, best first."
+      },
+      "ImagePart": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "image_url",
+            "title": "Type",
+            "default": "image_url"
+          },
+          "image_url": {
+            "$ref": "#/components/schemas/ImageURL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_url"
+        ],
+        "title": "ImagePart"
+      },
+      "ImageURL": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Url",
+            "description": "An http(s) URL, or a `data:` URI with base64."
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "low",
+                  "high"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ImageURL"
+      },
+      "JsonValue": {},
+      "Liveness": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "Liveness",
+        "description": "The process is up and serving requests."
+      },
+      "Media": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "Such as wav or mp3, for audio."
+          }
+        },
+        "type": "object",
+        "title": "Media",
+        "description": "Audio or video, as base64 `data` or a `url`; exactly one of the two."
+      },
+      "ModelInfo": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model's name, as its server lists it."
+          },
+          "inputs": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image",
+                "audio",
+                "video"
+              ]
+            },
+            "type": "array",
+            "title": "Inputs",
+            "description": "Text, and images, audio or video when the model takes them, as its server reports them, or as `LLM_INPUTS` says."
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "inputs"
+        ],
+        "title": "ModelInfo",
+        "description": "The model that answers, and what a message to it may carry."
+      },
+      "ModuleInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Its name, as its readiness check and its settings call it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ModuleInfo",
+        "description": "A module that's on."
+      },
+      "ModuleList": {
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleInfo"
+            },
+            "type": "array",
+            "title": "Modules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "modules"
+        ],
+        "title": "ModuleList",
+        "description": "The modules that are on, in the order the app lists them."
+      },
+      "NoulAnswer": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "noul",
+            "title": "Type"
+          },
+          "noul": {
+            "type": "number",
+            "title": "Noul",
+            "description": "The probability that the answer is yes."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "noul"
+        ],
+        "title": "NoulAnswer"
+      },
+      "NoulCriteria": {
+        "properties": {
+          "true": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True"
+          },
+          "false": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "NoulCriteria",
+        "description": "What yes and no mean, when the question alone doesn't say."
+      },
+      "NoulQuestion": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "noul",
+            "title": "Type"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NoulCriteria"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "instructions"
+        ],
+        "title": "NoulQuestion",
+        "description": "Yes or no, answered with the probability of yes."
+      },
+      "RagAnswer": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/RagSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "None when the model wasn't asked."
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refused": {
+            "type": "boolean",
+            "title": "Refused",
+            "description": "True when the documents couldn't ground an answer, and the model wasn't asked: no chunk was found, or none as similar as RAG_MIN_SIMILARITY asks."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources",
+          "content",
+          "refused"
+        ],
+        "title": "RagAnswer",
+        "description": "The answer, and the sources it was given."
+      },
+      "RagQuestion": {
+        "properties": {
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Messages"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Any generation parameter the model accepts, such as temperature, seed or reasoning_effort, sent as given. The provider's defaults apply to the rest."
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "How many chunks to answer from.",
+            "default": 5
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources",
+            "description": "Only these sources' chunks, if given."
+          }
+        },
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "RagQuestion",
+        "description": "A conversation whose last message, the user's, is the question: the stored chunks are\nsearched for it, and the best ones given to the model with the conversation.",
+        "examples": [
+          {
+            "limit": 5,
+            "messages": [
+              {
+                "content": "How long do refunds take?",
+                "role": "user"
+              }
+            ],
+            "parameters": {
+              "reasoning_effort": "none"
+            }
+          }
+        ]
+      },
+      "RagSource": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "chunk": {
+            "$ref": "#/components/schemas/Chunk"
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity",
+            "description": "How close its meaning is to the question's."
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "chunk",
+          "similarity"
+        ],
+        "title": "RagSource",
+        "description": "A chunk the model was given to answer from, by the number it cites it with."
+      },
+      "Readiness": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "unavailable"
+              ]
+            },
+            "type": "object",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "Readiness",
+        "description": "Whether every dependency can serve requests, with one entry per dependency."
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "title": "Role",
+        "description": "Who wrote a message."
+      },
+      "ScoreAnswer": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "score",
+            "title": "Type"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "The expected level's index; it may fall between two."
+          },
+          "legend": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Legend",
+            "description": "Each level's description, by index."
+          },
+          "probabilities": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Probabilities",
+            "description": "Each level's, summing to 1."
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "description": "From 0 to 1."
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "score",
+          "legend",
+          "probabilities",
+          "confidence"
+        ],
+        "title": "ScoreAnswer"
+      },
+      "ScoreQuestion": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "score",
+            "title": "Type"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "minItems": 2,
+            "title": "Criteria"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type",
+          "instructions",
+          "criteria"
+        ],
+        "title": "ScoreQuestion",
+        "description": "A level on a scale of 2 to 10 levels, described lowest first."
+      },
+      "SearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 5
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "hybrid",
+              "dense",
+              "words"
+            ],
+            "title": "Mode",
+            "description": "`hybrid`, by meaning and words fused by rank; `dense`, by meaning alone; `words`, by BM25 alone.",
+            "default": "hybrid"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources",
+            "description": "Only these sources' chunks, if given."
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "description": "A question, and how to search for it.",
+        "examples": [
+          {
+            "limit": 5,
+            "query": "How long do refunds take?"
+          }
+        ]
+      },
+      "SearchResult": {
+        "properties": {
+          "hits": {
+            "items": {
+              "$ref": "#/components/schemas/Hit"
+            },
+            "type": "array",
+            "title": "Hits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hits"
+        ],
+        "title": "SearchResult",
+        "description": "The chunks found."
+      },
+      "SourceList": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceSummary"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "title": "SourceList",
+        "description": "The sources stored, by name."
+      },
+      "SourceSummary": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "chunks"
+        ],
+        "title": "SourceSummary",
+        "description": "A source, and how many of its chunks are stored."
+      },
+      "StoreRequest": {
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/Chunk"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chunks"
+        ],
+        "title": "StoreRequest",
+        "description": "Chunks to store, each replacing any stored before under its id.",
+        "examples": [
+          {
+            "chunks": [
+              {
+                "id": "returns-1",
+                "metadata": {
+                  "page": 1
+                },
+                "source": "help/returns.md",
+                "text": "Items can be returned within 30 days, unused.",
+                "title": "Returns"
+              }
+            ]
+          }
+        ]
+      },
+      "Stored": {
+        "properties": {
+          "stored": {
+            "type": "integer",
+            "title": "Stored"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stored"
+        ],
+        "title": "Stored",
+        "description": "How many chunks were stored."
+      },
+      "StoredMessage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "The message before it; null for the first."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AudioPart"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VideoPart"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "type",
+                    "mapping": {
+                      "image_url": "#/components/schemas/ImagePart",
+                      "input_audio": "#/components/schemas/AudioPart",
+                      "input_video": "#/components/schemas/VideoPart",
+                      "text": "#/components/schemas/TextPart"
+                    }
+                  }
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning",
+            "description": "An answer's reasoning, when the model showed it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerDetails"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for questions."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "parent_id",
+          "role",
+          "content",
+          "created_at"
+        ],
+        "title": "StoredMessage",
+        "description": "A question or an answer, as it was written."
+      },
+      "StoredTurn": {
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/StoredMessage"
+          },
+          "answer": {
+            "$ref": "#/components/schemas/StoredMessage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "StoredTurn",
+        "description": "A question and its answer, stored together."
+      },
+      "TextPart": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text",
+            "title": "Type",
+            "default": "text"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TextPart"
+      },
+      "Usage": {
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt_tokens",
+          "completion_tokens",
+          "total_tokens"
+        ],
+        "title": "Usage",
+        "description": "Tokens one completion consumed, as the server reports them."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VideoPart": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "input_video",
+            "title": "Type",
+            "default": "input_video"
+          },
+          "input_video": {
+            "$ref": "#/components/schemas/Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_video"
+        ],
+        "title": "VideoPart"
+      },
+      "ContentDelta": {
+        "description": "The next piece of the answer.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ContentDelta",
+        "type": "object"
+      },
+      "ConversationDoneEvent": {
+        "description": "Data of the `done` event of an answer streamed in a conversation: how it ended, and the\nids the question and the answer were stored under.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "finish_reason",
+          "usage",
+          "question_id",
+          "answer_id"
+        ],
+        "title": "ConversationDoneEvent",
+        "type": "object"
+      },
+      "ErrorEvent": {
+        "description": "Data of an `error` event: a streamed answer failed after the stream had started.",
+        "properties": {
+          "status": {
+            "description": "The HTTP status the same request answers without streaming: 503 when the LLM, or a service the module uses, can't be reached; 504 when the LLM didn't answer in time; 429 when its provider is rate-limiting requests; 502 when it rejected the request; 404 when what the request was about is gone, such as a deleted conversation.",
+            "title": "Status",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "ErrorEvent",
+        "type": "object"
+      },
+      "RagDoneEvent": {
+        "description": "Data of the `done` event: how the answer ended.",
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refused": {
+            "title": "Refused",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "refused"
+        ],
+        "title": "RagDoneEvent",
+        "type": "object"
+      },
+      "RagSourcesEvent": {
+        "description": "Data of the `sources` event, which comes first: the chunks given to the model.",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/RagSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources"
+        ],
+        "title": "RagSourcesEvent",
+        "type": "object"
+      },
+      "ReasoningDelta": {
+        "description": "The next piece of the model's reasoning, which comes before the answer.",
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ReasoningDelta",
+        "type": "object"
+      },
+      "StreamEnd": {
+        "description": "The last part of a stream that ended normally.",
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "StreamEnd",
+        "type": "object"
+      }
+    }
+  }
+}

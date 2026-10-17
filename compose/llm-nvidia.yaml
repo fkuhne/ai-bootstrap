@@ -1,0 +1,12 @@
+# LLM_GPU=nvidia: an NVIDIA GPU, on Linux with the NVIDIA Container Toolkit,
+# or on Windows with Docker Desktop (WSL 2).
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11459
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

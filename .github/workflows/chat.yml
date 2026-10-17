@@ -1,0 +1,43 @@
+# The chat module's own checks (docs/foundations.md#chat-whole-or-streamed): its demo, against
+# the fake LLM, through the backend and through the web UI's origin. It belongs to the module:
+# deleting the module deletes this workflow. Its job starts only the services it needs, so
+# other modules' services stay out.
+name: Chat module
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chat-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Chat adds its endpoints over the core's LLM port, which the core's CI checks against the
+  # default model: the fake answers here.
+  LLM_PROVIDER: fake
+  LLM_LOCAL_SERVER: "0"
+
+jobs:
+  fake:
+    name: The chat demo against the fake LLM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the backend and the web UI
+        run: docker compose up -d --wait backend frontend
+      - name: The chat demo, through the backend
+        run: docker compose run --rm chat-demo
+      # The same calls through nginx, as the web UI makes them: streams pass the proxy.
+      - name: The chat demo, through the web UI's origin
+        run: docker compose run --rm -e BACKEND_URL=http://frontend:8080 chat-demo
+      - name: Logs
+        if: failure()
+        run: docker compose logs

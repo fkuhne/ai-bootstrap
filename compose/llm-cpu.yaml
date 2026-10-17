@@ -1,0 +1,4 @@
+# LLM_GPU=cpu (the default): runs on every machine.
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-b11459

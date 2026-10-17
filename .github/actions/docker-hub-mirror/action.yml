@@ -1,0 +1,18 @@
+name: Docker Hub mirror
+description: >-
+  Pull Docker Hub images through Google's public mirror. GitHub's shared runners get
+  rate-limited (429) on anonymous pulls from Docker Hub itself; the daemon falls back to
+  Docker Hub if the mirror fails (docs/foundations.md#ci).
+runs:
+  using: composite
+  steps:
+    - name: Add mirror.gcr.io to the Docker daemon
+      shell: bash
+      run: |
+        sudo mkdir -p /etc/docker
+        [ -s /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json >/dev/null
+        jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json \
+          | sudo tee /etc/docker/daemon.json.new >/dev/null
+        sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
+        sudo systemctl restart docker
+        docker info --format 'Registry mirrors: {{.RegistryConfig.Mirrors}}'

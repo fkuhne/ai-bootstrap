@@ -1,0 +1,195 @@
+.form {
+  width: 100%;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.75rem 0.5rem;
+  border: 1px solid color-mix(in oklch, var(--border) 30%, transparent);
+  border-radius: 1.5rem;
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+
+.box:focus-within {
+  border-color: var(--border);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .box {
+    border-color: color-mix(in oklch, var(--border) 20%, transparent);
+    background: color-mix(in oklch, var(--muted) 75%, transparent);
+  }
+}
+
+.input {
+  min-height: 3rem;
+  max-height: 40dvh;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  outline: none;
+  background: transparent;
+  line-height: 1.5rem;
+  resize: none;
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.25rem;
+  padding: 0 0.25rem;
+  list-style: none;
+}
+
+.attachment {
+  position: relative;
+}
+
+.attachment img,
+.attachment video {
+  height: 4rem;
+  max-height: none;
+}
+
+.remove {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.375rem;
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--muted-foreground);
+}
+
+.remove:hover {
+  color: var(--foreground);
+}
+
+.remove svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* The file picker the attach button opens; never shown itself. */
+.picker {
+  display: none;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The reasoning level, beside the model's name: a native select, small and gray. */
+.reasoning {
+  display: flex;
+  flex: none;
+  gap: 0.125rem;
+  align-items: center;
+  margin-right: auto;
+  padding-left: 0.375rem;
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--muted-foreground);
+}
+
+.reasoning:hover,
+.reasoning:focus-within {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.reasoning svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.reasoning select {
+  padding: 0.25rem 0.125rem;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+/* The round button keeps to the right. */
+.actions > :last-child {
+  margin-left: auto;
+}
+
+.send,
+.stop {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+}
+
+.send {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.send:disabled {
+  opacity: 0.5;
+}
+
+.send svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.stop {
+  background: none;
+  color: var(--muted-foreground);
+}
+
+.stop:hover {
+  background: color-mix(in oklch, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.stop svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.problem {
+  margin: 0.5rem 1rem 0;
+  color: var(--destructive);
+  font-size: 0.8125rem;
+}

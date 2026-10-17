@@ -1,0 +1,204 @@
+# Start everything: docker compose up -d --wait
+# Settings come from the environment or an optional .env file; see .env.example.
+
+# The modules: each one's services in a file of its own, one line each
+# (docs/foundations.md#modules).
+include:
+  - compose/modules/chat.yaml
+  - compose/modules/conversations.yaml
+  - compose/modules/decision.yaml
+  - compose/modules/rag.yaml
+
+# The backend's settings, passed through only when set, in .env or the shell; otherwise the
+# backend's own default applies (docs/foundations.md#the-backends-layout-and-gates).
+x-backend-environment: &backend-environment
+  APP_NAME:
+  APP_LOG_LEVEL:
+  APP_DOCS_ENABLED:
+  TZ:
+  LLM_PROVIDER:
+  LLM_BASE_URL:
+  LLM_API_KEY:
+  LLM_MODEL:
+  LLM_TIMEOUT_SECONDS:
+  LLM_MAX_RETRIES:
+  LLM_INPUTS:
+  # The chat module's settings.
+  CHAT_ENABLED:
+  # The conversations module's settings. The database is its postgres service unless
+  # DATABASE_URL says otherwise; the module's migrate-db job reads the same.
+  CONVERSATIONS_ENABLED:
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://app:${POSTGRES_PASSWORD:-app-local}@postgres:5432/app}
+  # The decision module's settings.
+  DECISION_ENABLED:
+  DECISION_PROVIDER:
+  DECISION_BASE_URL:
+  DECISION_API_KEY:
+  DECISION_MODEL:
+  DECISION_TIMEOUT_SECONDS:
+  # The RAG module's settings.
+  RAG_ENABLED:
+  RAG_PROVIDER:
+  RAG_QDRANT_URL:
+  RAG_QDRANT_API_KEY:
+  RAG_EMBEDDING_BASE_URL:
+  RAG_EMBEDDING_API_KEY:
+  RAG_EMBEDDING_MODEL:
+  RAG_QUERY_FORMAT:
+  RAG_DOCUMENT_FORMAT:
+  RAG_TIMEOUT_SECONDS:
+  RAG_COLLECTION:
+  RAG_BM25_LANGUAGE:
+  RAG_BM25_AVG_LEN:
+  RAG_MIN_SIMILARITY:
+
+services:
+  # The local LLM server: llama.cpp's llama-server, with an OpenAI-compatible API.
+  llm:
+    # LLM_GPU picks the variant: cpu (default), nvidia or vulkan. Each file in compose/ holds only
+    # that variant's image and GPU access (docs/foundations.md#the-local-llm-server).
+    extends:
+      file: compose/llm-${LLM_GPU:-cpu}.yaml
+      service: llm
+    # 0 leaves the local server out, when the model is elsewhere
+    # (docs/foundations.md#models-elsewhere).
+    scale: ${LLM_LOCAL_SERVER:-1}
+    environment:
+      # Set explicitly: llama.cpp plans to change its default port.
+      LLAMA_ARG_PORT: 8080
+      LLAMA_CACHE: /models
+      LLAMA_ARG_HF_REPO: ${LLM_HF_MODEL:-unsloth/Qwen3.5-4B-GGUF:Q4_K_M}
+      LLAMA_ARG_CTX_SIZE: ${LLM_CONTEXT_SIZE:-8192}
+      # Only pages served from this machine may call it from a browser. llama.cpp lets every
+      # origin by default, so any website open in the browser could use the model. The backend
+      # calls it from inside Docker, where CORS doesn't apply.
+      LLAMA_ARG_CORS_ORIGINS: localhost
+    volumes:
+      - llm-models:/models
+    ports:
+      - 127.0.0.1:${LLM_PORT:-8080}:8080
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/health"]
+      # The first start downloads the model, so failures count only after 30 minutes.
+      start_period: 30m
+      start_interval: 5s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # The backend: a FastAPI app with its API under /api.
+  backend:
+    extends:
+      file: compose/backend.yaml
+      service: backend
+    environment: *backend-environment
+    depends_on:
+      # The conversations module's job: the backend starts once the tables are current, or at
+      # once without the module.
+      migrate-db:
+        condition: service_completed_successfully
+        required: false
+    ports:
+      - 127.0.0.1:${BACKEND_PORT:-8000}:8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=4)"]
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # The gates, for the backend and the scripts: docker compose run --rm backend-checks
+  # The source is mounted read-only, so the checks see the current code; the
+  # tools write their caches to /tmp.
+  backend-checks:
+    build:
+      context: backend
+      target: dev
+    profiles: [tools]
+    volumes:
+      - ./backend:/app:ro
+      # Writable, so `alembic revision --autogenerate` writes the conversations module's new
+      # migration here.
+      - ./backend/app/modules/conversations/migrations/versions:/app/app/modules/conversations/migrations/versions
+      # Writable, so `python -m app.openapi` writes the API's schema for the web UI here.
+      - ./frontend/src/api:/frontend/src/api
+      - ./scripts:/scripts:ro
+      # What the check that each module has its places reads, at the same places relative to
+      # the backend's code (docs/modules/README.md).
+      - ./compose.yaml:/compose.yaml:ro
+      - ./compose:/compose:ro
+      - ./.env.example:/.env.example:ro
+      - ./.github/workflows:/.github/workflows:ro
+      - ./docs/modules:/docs/modules:ro
+    environment:
+      # The live tests (pytest -m integration) reach the LLM the backend is set to.
+      <<: *backend-environment
+      COVERAGE_FILE: /tmp/.coverage
+      MYPY_CACHE_DIR: /tmp/.mypy_cache
+      RUFF_CACHE_DIR: /tmp/.ruff_cache
+    command:
+      - sh
+      - -c
+      - >-
+        ruff check && ruff format --check && mypy && lint-imports --no-cache
+        && pytest -p no:cacheprovider
+        && ruff check --config pyproject.toml /scripts
+        && ruff format --check --config pyproject.toml /scripts
+        && MYPYPATH=/scripts mypy /scripts
+
+  # The web UI: nginx serves the React app and forwards /api to the backend, from one origin. It
+  # depends on nothing and starts first, so the page opens at once and says what isn't ready yet
+  # (docs/foundations.md#the-web-ui).
+  frontend:
+    build:
+      context: frontend
+      target: runtime
+      args:
+        # The app's name, in the page's title and its sidebar, as in the API's title.
+        APP_NAME: ${APP_NAME:-ai-bootstrap}
+    ports:
+      - 127.0.0.1:${FRONTEND_PORT:-3000}:8080
+    healthcheck:
+      # nginx's Alpine image has busybox's wget, not curl.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      start_period: 10s
+      start_interval: 2s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # The gates, for the web UI: docker compose run --rm frontend-checks
+  # The image holds a copy of the source, rebuilt at every run from Docker's cache in
+  # seconds, so the checks see the current code, and never packages installed on the
+  # host for `npm run dev`, which may be another system's.
+  frontend-checks:
+    build:
+      context: frontend
+      target: dev
+    pull_policy: build
+    profiles: [tools]
+    volumes:
+      # The source itself, writable, so `npm run format` and `npm run api:types` write
+      # their changes here.
+      - ./frontend/src:/app/src
+
+  # Asks the LLM a question in each input it accepts: docker compose run --rm llm-check
+  llm-check:
+    image: python:3.14.8-slim-trixie
+    profiles: [tools]
+    # It waits for the local server when there is one, and reaches the LLM the
+    # backend is set to.
+    depends_on:
+      llm:
+        condition: service_healthy
+        required: false
+    environment: *backend-environment
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["python", "/scripts/check_llm.py"]
+
+volumes:
+  llm-models:

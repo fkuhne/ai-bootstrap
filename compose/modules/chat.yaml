@@ -1,0 +1,18 @@
+# The chat module's demo: chat has no services of its own, since it asks the core's LLM
+# (docs/foundations.md#chat-whole-or-streamed). compose.yaml pulls this file in; delete both,
+# and the module's settings, to remove it.
+services:
+  # Calls the chat module as an app would: docker compose run --rm chat-demo ["question"]
+  chat-demo:
+    image: python:3.14.8-slim-trixie
+    profiles: [tools]
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      CHAT_DEMO_PARAMETERS:
+      # The demo imports the core's helpers, demo.py and media.py, from the scripts' folder.
+      PYTHONPATH: /scripts
+    volumes:
+      - ../../scripts:/scripts:ro
+    entrypoint: ["python", "/scripts/modules/chat/demo_chat.py"]

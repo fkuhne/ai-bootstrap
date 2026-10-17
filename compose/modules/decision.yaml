@@ -1,0 +1,53 @@
+# The decision module's service: llama.cpp's server with a native decision model, which
+# answers System One questions at /v1/systemone (docs/foundations.md#the-decision-model).
+# compose.yaml pulls this file in; delete both, and the module's settings, to remove it.
+services:
+  decision:
+    # The LLM's variant files: the same pinned image, and the GPU access. It follows LLM_GPU
+    # unless DECISION_GPU says otherwise.
+    extends:
+      file: ../llm-${DECISION_GPU:-${LLM_GPU:-cpu}}.yaml
+      service: llm
+    # 0 leaves the local server out, when the decision model is elsewhere; it follows
+    # DECISION_ENABLED unless set.
+    scale: ${DECISION_LOCAL_SERVER:-${DECISION_ENABLED:-1}}
+    environment:
+      LLAMA_ARG_PORT: 8080
+      LLAMA_CACHE: /models
+      LLAMA_ARG_HF_REPO: ${DECISION_HF_MODEL:-ggml-org/Laya-GGUF:Q8_0}
+      # A decision model reads each prompt in one batch, which llama.cpp keeps to 512 tokens by
+      # default: a longer text failed. The batch takes the whole context instead.
+      LLAMA_ARG_CTX_SIZE: ${DECISION_CONTEXT_SIZE:-8192}
+      LLAMA_ARG_BATCH: ${DECISION_CONTEXT_SIZE:-8192}
+      LLAMA_ARG_UBATCH: ${DECISION_CONTEXT_SIZE:-8192}
+      # Only pages served from this machine may call it from a browser. llama.cpp lets every
+      # origin by default, so any website open in the browser could use the model. The backend
+      # calls it from inside Docker, where CORS doesn't apply.
+      LLAMA_ARG_CORS_ORIGINS: localhost
+    volumes:
+      - decision-models:/models
+    ports:
+      - 127.0.0.1:${DECISION_PORT:-8081}:8080
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/health"]
+      # The first start downloads the model, so failures count only after 15 minutes.
+      start_period: 15m
+      start_interval: 5s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Asks the decision model through the backend, as an app would, and checks each answer:
+  # docker compose run --rm decision-demo ["your own text"]
+  decision-demo:
+    image: python:3.14.8-slim-trixie
+    profiles: [tools]
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ../../scripts/modules/decision:/scripts:ro
+    entrypoint: ["python", "/scripts/demo_decision.py"]
+
+volumes:
+  decision-models:

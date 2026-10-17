@@ -1,0 +1,7 @@
+# LLM_GPU=vulkan: an AMD or Intel GPU on Linux, or the Apple GPU in a VM that
+# exposes Vulkan (krunkit or libkrun, as in Podman or Colima's krunkit type).
+services:
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan-b11459
+    devices:
+      - /dev/dri:/dev/dri

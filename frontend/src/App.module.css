@@ -1,0 +1,52 @@
+.app {
+  display: flex;
+  height: 100dvh;
+}
+
+.main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Opens the sidebar while it's closed, at the page's top left, as in llama.cpp's web UI; over
+   the conversation as it scrolls, so on a blurred background of its own. */
+.opener {
+  position: absolute;
+  z-index: 1;
+  top: 0.75rem;
+  left: 0.75rem;
+  background: color-mix(in oklch, var(--background) 80%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  background: rgb(0 0 0 / 0.4);
+}
+
+/* The modules' entries, above the open module's own sidebar content. */
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* What the main area says while it has no page to show. */
+.notice,
+.empty {
+  width: min(48rem, 100% - 2rem);
+  margin: auto;
+}
+
+.empty {
+  color: var(--muted-foreground);
+  text-align: center;
+}

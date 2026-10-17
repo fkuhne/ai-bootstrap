@@ -1,0 +1,50 @@
+.sidebar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 18rem;
+  padding: 0.75rem 0.5rem;
+  border-right: 1px solid var(--sidebar-border);
+  background: var(--sidebar);
+}
+
+.sidebar[hidden] {
+  display: none;
+}
+
+/* On a narrow screen: over the page, from the left edge. */
+.drawer {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(18rem, 85vw);
+  box-shadow: 0 0 2rem rgb(0 0 0 / 0.25);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 0.5rem;
+}
+
+.name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name:focus {
+  outline: none;
+}
+
+.name a {
+  color: inherit;
+  text-decoration: none;
+}

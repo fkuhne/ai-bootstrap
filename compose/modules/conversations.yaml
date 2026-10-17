@@ -1,0 +1,69 @@
+# The conversations module's services: PostgreSQL, which keeps the conversations, and the
+# migrate-db job, which brings its tables up to date (docs/foundations.md#conversations).
+# compose.yaml pulls this file in, and its backend waits for the job; delete this file, those
+# lines and the module's settings to remove it.
+services:
+  # The database, pinned to one release.
+  postgres:
+    image: postgres:18.6-alpine3.24
+    # 0 leaves it out, for a database elsewhere (DATABASE_URL); it follows CONVERSATIONS_ENABLED
+    # unless set.
+    scale: ${CONVERSATIONS_LOCAL_DATABASE:-${CONVERSATIONS_ENABLED:-1}}
+    environment:
+      POSTGRES_USER: app
+      # Set once, when the volume is first created; changing it later needs a new volume.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app-local}
+      POSTGRES_DB: app
+    volumes:
+      # Version 18 keeps its data in a folder per major version below this one.
+      - postgres-data:/var/lib/postgresql
+    ports:
+      # Loopback only, for the host's tools. Not 5432, which a PostgreSQL installed on the
+      # host often holds: the clash would stop the whole stack from starting.
+      - 127.0.0.1:${POSTGRES_PORT:-5433}:5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username", "app", "--dbname", "app"]
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Creates or updates the tables with Alembic's migrations, then exits. It runs at every
+  # start and does nothing when they're current; the backend waits for it.
+  migrate-db:
+    extends:
+      file: ../backend.yaml
+      service: backend
+    # 0 with the module off. Written 0 or 1, as CONVERSATIONS_ENABLED always is.
+    scale: ${CONVERSATIONS_ENABLED:-1}
+    environment:
+      APP_LOG_LEVEL:
+      TZ:
+      # The same database as the backend's, in compose.yaml.
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://app:${POSTGRES_PASSWORD:-app-local}@postgres:5432/app}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        # Left out, with a database elsewhere.
+        required: false
+
+  # Calls the conversations module as an app would: docker compose run --rm conversations-demo
+  conversations-demo:
+    image: python:3.14.8-slim-trixie
+    profiles: [tools]
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      CHAT_DEMO_PARAMETERS:
+      # The demo imports the core's helpers, demo.py, from the scripts' folder.
+      PYTHONPATH: /scripts
+    volumes:
+      - ../../scripts:/scripts:ro
+    entrypoint: ["python", "/scripts/modules/conversations/demo_conversations.py"]
+
+volumes:
+  postgres-data:

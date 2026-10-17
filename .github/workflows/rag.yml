@@ -1,0 +1,48 @@
+# The RAG module's own checks (docs/foundations.md#rag): Qdrant and the embedding model on
+# CPU, through the backend's readiness, the module's live tests and its demo. It belongs to the
+# module: deleting the module deletes this workflow. Its job starts only the services it needs,
+# so other modules' services stay out.
+name: RAG module
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rag-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The chat model isn't what this job checks: the fake answers in its place.
+  LLM_PROVIDER: fake
+  LLM_LOCAL_SERVER: "0"
+
+jobs:
+  services:
+    name: Qdrant and EmbeddingGemma 2, on CPU
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the backend, Qdrant, the embedding model and the web UI (the first start downloads the model, 0.31 GB)
+        run: docker compose up -d --wait backend qdrant embedding frontend
+      - name: The backend finds both ready
+        run: curl -s http://127.0.0.1:8000/api/health/ready | jq -e '.checks.rag == "ok"'
+      - name: The live tests, against both
+        run: docker compose run --rm backend-checks pytest -m integration --no-cov -p no:cacheprovider -k rag_live
+      - name: The RAG demo, through the backend
+        run: docker compose run --rm rag-demo
+      # The same calls through nginx, as an app's own pages would make them.
+      - name: The RAG demo, through the web UI's origin
+        run: docker compose run --rm -e BACKEND_URL=http://frontend:8080 rag-demo
+      - name: The sample chunks, each question finding its chunk among the first three
+        run: docker compose run --rm rag-samples
+      - name: Logs
+        if: failure()
+        run: docker compose logs

@@ -1,0 +1,83 @@
+# CI: the gates, then the stack as users start it (docs/foundations.md#ci). Every step is a docker
+# compose command a user can run the same way.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Gates (lint, format, types, imports, tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Backend and scripts
+        run: docker compose run --rm backend-checks
+      - name: Web UI
+        run: docker compose run --rm frontend-checks
+
+  stack-with-the-fake:
+    name: The stack with the fake LLM
+    needs: gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      LLM_PROVIDER: fake
+      LLM_LOCAL_SERVER: "0"
+      DECISION_PROVIDER: fake
+      DECISION_LOCAL_SERVER: "0"
+      RAG_PROVIDER: fake
+      RAG_LOCAL_QDRANT: "0"
+      RAG_LOCAL_EMBEDDING: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      # It depends on nothing: the page opens before the backend exists, and says so.
+      - name: The web UI starts alone, before anything else
+        run: |
+          docker compose up -d --wait frontend
+          test "$(docker compose ps --services --status running)" = "frontend"
+          curl -fsS http://127.0.0.1:3000/ | grep -q "<title>ai-bootstrap</title>"
+          curl -fsS http://127.0.0.1:3000/any/page | grep -q '<div id="root">'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health/ready)" = 502
+      - name: Start the stack
+        run: docker compose up -d --wait
+      - name: Readiness through the web UI's origin
+        run: curl -fsS http://127.0.0.1:3000/api/health/ready
+      - name: The live tests (the fake LLM, and the modules' services that are on)
+        run: docker compose run --rm backend-checks pytest -m integration --no-cov -p no:cacheprovider
+      - name: Logs
+        if: failure()
+        run: docker compose logs
+
+  stack-with-the-local-model:
+    name: The stack with the default local model, on CPU
+    # The model's download and CPU answers take minutes: pushes to main and manual runs only.
+    if: github.event_name != 'pull_request'
+    needs: gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/docker-hub-mirror
+      - name: Start the stack (the first start downloads the model)
+        run: docker compose up -d --wait
+      - name: The LLM check, in each input the model accepts
+        run: docker compose run --rm llm-check
+      - name: The live tests
+        run: docker compose run --rm backend-checks pytest -m integration --no-cov -p no:cacheprovider
+      - name: Logs
+        if: failure()
+        run: docker compose logs

@@ -1,0 +1,13 @@
+# The backend's image, which the API and the conversations module's migrate-db job extend: one
+# name, so rebuilding one rebuilds what both run. The project name keeps two apps made from the
+# template apart.
+services:
+  backend:
+    image: ${COMPOSE_PROJECT_NAME}-backend
+    build:
+      context: ../backend
+      target: runtime
+    # Lets a model or a database served on this machine, outside Docker, be reached at
+    # host.docker.internal on Linux too, as Docker Desktop allows.
+    extra_hosts:
+      - host.docker.internal:host-gateway

@@ -1,0 +1,5 @@
+dist
+package-lock.json
+# Generated: the backend writes openapi.json, and npm run api:types writes schema.d.ts.
+src/api/openapi.json
+src/api/schema.d.ts
